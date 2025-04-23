@@ -2,6 +2,7 @@ from time import time
 import pandas as pd
 import numpy as np
 import torch
+from torch.optim.lr_scheduler import StepLR
 from tqdm import trange, tqdm
 import wandb
 import json
@@ -92,7 +93,9 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
         saved_model_state_dict: State dictionary of the best saved model.
     """
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    bar_desc = 'Training, avg loss: %.5f'
+    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)  
+
+    bar_desc = 'Training, avg loss: %.3f'
     log = []
     saved_model_state_dict = None
     best_loss = 1e9
@@ -108,7 +111,7 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
         project = "TrajFM TUL",
         config={
             **data_summary,
-            
+
             "epoch" : int(config["finetune"]["config"]["num_epoch"]),
             "batch_size" : int(config["finetune"]["dataloader"]["batch_size"]),
             "learning_rate" : float(config["finetune"]["config"]["lr"]),
@@ -147,16 +150,16 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
             loss_epoch = np.mean(loss_values)
             bar.set_description(bar_desc % loss_epoch)
             log.append({'epoch': epoch_i, 'time': epoch_time, 'loss': loss_epoch})
+            scheduler.step()
             
             # Validation
             val_metrics, val_loss = test_user_model(model, device, val_dataloader)
-            # print("Validation Metrics:", val_metrics)
+
             for key, value in val_metrics.items():
-                print(f"{key}: {round(value * 100, 3)}%,")
+                print(f"{key}: {round(value * 100, 2)}%,")
             print("val_loss", round(val_loss, 3))
-            
             # Log validation metrics
-            log[-1].update(val_metrics) 
+            log[-1].update(val_metrics)
             log_data = {
                 "epoch": epoch_i + 1,
                 "Train_Loss": loss,

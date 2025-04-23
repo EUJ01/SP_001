@@ -224,7 +224,7 @@ class TrajFM(nn.Module):
             user_labels (torch.LongTensor): User labels as indices with shape (B,).
         """
         # Forward pass
-        _, mem_seq = self.forward(input_seq, positions)  # (B, L, E)
+        modal_h, mem_seq = self.forward(input_seq, positions)  # (B, L, E)
         _, _, _, pred_user = self.pred(mem_seq)
         
         pred_indices = torch.argmax(pred_user, dim=1)

@@ -1,10 +1,10 @@
 [
     {
-        "save_name": "config_test_v2",
+        "save_name": "U89_TrajAll_L1000_v2",
         "dataset": {
-            "train_traj_df": "./dataset/geolife_U56_Traj200_L200.h5",
-            "test_traj_df": "./dataset/geolife_U56_Traj200_L200.h5",
-            "poi_df": "./dataset/geolife_U56_Traj200_L200.h5",
+            "train_traj_df": "./dataset/geolife_U89_TrajAll_L1000.h5",
+            "test_traj_df": "./dataset/geolife_U89_TrajAll_L1000.h5",
+            "poi_df": "./dataset/geolife_U89_TrajAll_L1000.h5",
             "poi_embed": "dataset/geolife_poi_embed.npy"
         },
         "trajfm": {
@@ -27,7 +27,7 @@
                 }
             },
             "config": {
-                "num_epoch": 3,
+                "num_epoch": 30,
                 "lr": 0.0001
             }
         }
