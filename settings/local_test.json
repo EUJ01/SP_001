@@ -1,11 +1,11 @@
 [
     {
-        "save_name": "V_L300_U90",
+        "save_name": "config_test_v2",
         "dataset": {
-            "train_traj_df": "./dataset/geolife_L300_U90.h5",
-            "test_traj_df": "./dataset/geolife_L300_U90.h5",
-            "poi_df": "./dataset/geolife_L300_U90.h5",
-            "poi_embed": "./dataset/geolife_poi_embed.npy"
+            "train_traj_df": "./dataset/geolife_U56_Traj200_L200.h5",
+            "test_traj_df": "./dataset/geolife_U56_Traj200_L200.h5",
+            "poi_df": "./dataset/geolife_U56_Traj200_L200.h5",
+            "poi_embed": "dataset/geolife_poi_embed.npy"
         },
         "trajfm": {
             "embed_size": 64,
@@ -23,11 +23,11 @@
             "padder": {
                 "name": "tul",
                 "params": {
-                    "num_users":89
+                    "num_users": "null"
                 }
             },
             "config": {
-                "num_epoch": 30,
+                "num_epoch": 3,
                 "lr": 0.0001
             }
         }

@@ -77,7 +77,7 @@ def test_model(model, device, dataloader):
     return predictions, targets
 
 # MOD
-def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch, lr):
+def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch, lr, data_summary):
     """Train the model given the training dataloader and validate after each epoch.
     
     Args:
@@ -100,18 +100,21 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
     # wandb
     with open(os.path.join('settings', f'local_test.json'), 'r') as fp:
         config = json.load(fp)
+    
+    config = config[0]
         
     run = wandb.init(
         entity = "SP_001",
         project = "TrajFM TUL",
         config={
-            "epoch" : int(config["finetune"]["config"]["epoch"]),
+            **data_summary,
+            
+            "epoch" : int(config["finetune"]["config"]["num_epoch"]),
             "batch_size" : int(config["finetune"]["dataloader"]["batch_size"]),
             "learning_rate" : float(config["finetune"]["config"]["lr"]),
             
-            "num_users": model.user,
             "embed_size": config["trajfm"]["embed_size"],
-            "d_model": config["traj_fm"]["d_model"],
+            "d_model": config["trajfm"]["d_model"],
             "rope_layer": config["trajfm"]["rope_layer"],
         },
         id = config["save_name"],

@@ -12,4 +12,5 @@ samples/
 wandb/
 .lightning_studio/
 .netrc
+settings/cache/
 
