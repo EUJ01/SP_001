@@ -4,6 +4,7 @@
 .idea
 .vscode-server
 __pycache__/
+.wget-hsts
 
 # Data
 dataset/
