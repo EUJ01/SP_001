@@ -1,0 +1,14 @@
+# IDE / Editor
+.vscode/
+.DS_Store
+.idea
+.vscode-server
+__pycache__/
+
+# Data
+dataset/
+samples/
+wandb/
+.lightning_studio/
+.netrc
+
