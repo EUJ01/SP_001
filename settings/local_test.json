@@ -1,6 +1,6 @@
 [
     {
-        "save_name": "U89_TrajAll_L1000_v3.3_noROPE",
+        "save_name": "U89_TrajAll_L1000_v3.7_noROPE",
         "dataset": {
             "train_traj_df": "./dataset/geolife_U89_TrajAll_L1000.h5",
             "test_traj_df": "./dataset/geolife_U89_TrajAll_L1000.h5",
@@ -27,9 +27,9 @@
                 }
             },
             "config": {
-                "num_epoch": 30,
+                "num_epoch": 70,
                 "lr": 0.0001,
-                "step_size" : 20,
+                "step_size" : 60,
                 "gamma" : 0.1
             }
         }

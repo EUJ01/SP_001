@@ -97,9 +97,10 @@ class TrajFM(nn.Module):
         batch_mask = token[..., 0] == PAD_TOKEN
         causal_mask = gen_causal_mask(L).to(input_seq.device)
 
+        # Mod 
         # mem_seq = self.seq_model(modal_h, norm_coord, mask=causal_mask, src_key_padding_mask=batch_mask)
-        # Mod
         mem_seq = modal_h
+        # Mod 
 
         return modal_h, mem_seq
 
@@ -139,8 +140,10 @@ class TrajFM(nn.Module):
         poi_e += token_e[:, :, 0]
         
         # Embed temporal tokens.
-        temporal_e = torch.cat([module(temporal_token[..., i])
-                                for i, module in enumerate(self.temporal_embed_modules)], -1)
+        temporal_e_list = [module(temporal_token[..., i]) for i, module in enumerate(self.temporal_embed_modules)]
+        temporal_e = torch.cat(temporal_e_list, dim=-1)
+
+        # temporal_e = torch.cat([module(temporal_token[..., i]) for i, module in enumerate(self.temporal_embed_modules)], -1)
         temporal_e = self.temporal_embed_layer(temporal_e)
         temporal_e.masked_fill(feature_e_mask[..., 1].unsqueeze(-1), 0)
         temporal_e += token_e[:, :, 1]
@@ -338,7 +341,10 @@ class TrajFM(nn.Module):
         pred_spatial = coord_transform_GPS_UTM(pred_spatial * self.scale + np.expand_dims(self.spatial_middle_coord, 0), self.UTM_region, origin_coord="utm")
         target_spatial = coord_transform_GPS_UTM(target_spatial * self.scale + np.expand_dims(self.spatial_middle_coord, 0), self.UTM_region, origin_coord="utm")
 
-        pred_temporal_token, pred_token = pred_temporal_token.cpu().numpy(), pred_token.cpu().numpy()
+        # pred_temporal_token, pred_token = pred_temporal_token.cpu().numpy(), pred_token.cpu().numpy()
+        pred_temporal_token = pred_temporal_token.cpu().numpy()
+        pred_token = [t.cpu().numpy() for t in pred_token]
+
         target_temp_token, target_token = target_temp_token.cpu().numpy(), target_token.cpu().numpy()
         
         return [pred_spatial, pred_temporal_token, pred_token], \
