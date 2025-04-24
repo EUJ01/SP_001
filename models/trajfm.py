@@ -96,7 +96,11 @@ class TrajFM(nn.Module):
         # Utilizing the padding token to derive a batch mask of shape (B, L).
         batch_mask = token[..., 0] == PAD_TOKEN
         causal_mask = gen_causal_mask(L).to(input_seq.device)
-        mem_seq = self.seq_model(modal_h, norm_coord, mask=causal_mask, src_key_padding_mask=batch_mask)
+
+        # mem_seq = self.seq_model(modal_h, norm_coord, mask=causal_mask, src_key_padding_mask=batch_mask)
+        # Mod
+        mem_seq = modal_h
+
         return modal_h, mem_seq
 
     def cal_modal_h(self, spatial, temporal_token, token, positions):
@@ -144,6 +148,10 @@ class TrajFM(nn.Module):
         # Aggregate and mix the hidden states of all modals.
         modal_e = rearrange(torch.stack([spatial_e, temporal_e, poi_e], 2),
                             'B L F E -> (B L) F E')
+
+        # Mod no POI
+        # modal_e = rearrange(torch.stack([spatial_e, temporal_e], 2),
+        #                     'B L F E -> (B L) F E')
                             
         modal_h = rearrange(self.modal_mixer(modal_e), '(B L) F E -> B L F E', B=B).mean(axis=2)
 
@@ -224,7 +232,7 @@ class TrajFM(nn.Module):
             user_labels (torch.LongTensor): User labels as indices with shape (B,).
         """
         # Forward pass
-        modal_h, mem_seq = self.forward(input_seq, positions)  # (B, L, E)
+        _, mem_seq = self.forward(input_seq, positions)  # (B, L, E)
         _, _, _, pred_user = self.pred(mem_seq)
         
         pred_indices = torch.argmax(pred_user, dim=1)
@@ -277,8 +285,8 @@ class TrajFM(nn.Module):
         return {
             'ACC@1': acc_1,
             'ACC@5': acc_5,
-            'Macro-R': recall,
             'Macro-P': precision,
+            'Macro-R': recall,
             'Macro-F1': f1
         }
     #MOD

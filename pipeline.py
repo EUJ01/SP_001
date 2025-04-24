@@ -78,7 +78,7 @@ def test_model(model, device, dataloader):
     return predictions, targets
 
 # MOD
-def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch, lr, data_summary):
+def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch, lr, step_size, gamma, data_summary):
     """Train the model given the training dataloader and validate after each epoch.
     
     Args:
@@ -92,8 +92,12 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
         log (DataFrame): Log containing epoch-wise training losses and validation scores.
         saved_model_state_dict: State dictionary of the best saved model.
     """
+    with open(os.path.join('settings', f'local_test.json'), 'r') as fp:
+        config = json.load(fp)
+        config = config[0]
+
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)  
+    scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  
 
     bar_desc = 'Training, avg loss: %.3f'
     log = []
@@ -101,21 +105,16 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
     best_loss = 1e9
     
     # wandb
-    with open(os.path.join('settings', f'local_test.json'), 'r') as fp:
-        config = json.load(fp)
-    
-    config = config[0]
-        
     run = wandb.init(
         entity = "SP_001",
         project = "TrajFM TUL",
         config={
             **data_summary,
-
             "epoch" : int(config["finetune"]["config"]["num_epoch"]),
             "batch_size" : int(config["finetune"]["dataloader"]["batch_size"]),
             "learning_rate" : float(config["finetune"]["config"]["lr"]),
-            
+            "step_size" : step_size,
+            "gamma" : gamma,
             "embed_size": config["trajfm"]["embed_size"],
             "d_model": config["trajfm"]["d_model"],
             "rope_layer": config["trajfm"]["rope_layer"],
