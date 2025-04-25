@@ -33,42 +33,37 @@ class TrajFM(nn.Module):
 
         self.poi_coors = poi_coors
         self.UTM_region = UTM_region
-        
         self.spatial_middle_coord = spatial_middle_coord
         self.scale = scale
-        
         self.user = user
 
         # Embedding layers for mapping raw features into latent embeddings.
-        self.spatial_embed_layer = nn.Sequential(nn.Linear(2, embed_size), nn.LeakyReLU(),
-                                                 nn.Linear(embed_size, d_model))
+        self.spatial_embed_layer = nn.Sequential(nn.Linear(2, embed_size), nn.LeakyReLU(), nn.Linear(embed_size, d_model))
+
         self.temporal_embed_modules = nn.ModuleList([FourierEncode(embed_size) for _ in range(4)])
         self.temporal_embed_layer = nn.Sequential(nn.LeakyReLU(), nn.Linear(embed_size * 4, d_model))
-        # self.poi_embed_mat = nn.Embedding(*poi_embed.shape)
-        # self.poi_embed_mat.weight = nn.Parameter(torch.from_numpy(poi_embed).float(), requires_grad=False)
-        self.poi_embed_mat = poi_embed 
 
-        self.poi_embed_layer = nn.Sequential(nn.LayerNorm(poi_embed.shape[1]),
-                                             nn.Linear(poi_embed.shape[1], d_model))
-        self.token_embed_layer = nn.Sequential(nn.Embedding(6, embed_size, padding_idx=5), nn.LayerNorm(embed_size),
-                                               nn.Linear(embed_size, d_model))
+        self.poi_embed_mat = poi_embed 
+        self.poi_embed_layer = nn.Sequential(nn.LayerNorm(poi_embed.shape[1]), nn.Linear(poi_embed.shape[1], d_model))
+
+        self.token_embed_layer = nn.Sequential(nn.Embedding(6, embed_size, padding_idx=5), nn.LayerNorm(embed_size), nn.Linear(embed_size, d_model))
         self.pos_encode_layer = PositionalEncode(d_model)
 
         # Self-attention layer for aggregating the modals.
         self.modal_mixer = nn.TransformerEncoder(
             nn.TransformerEncoderLayer(d_model=d_model, nhead=8, dim_feedforward=256, batch_first=True),
             num_layers=1)
-
-        # Sequential model.
         self.seq_model = RoPE_Encoder(d_model, layers=rope_layer)
 
         # Prediction modules.
         self.spatial_pred_layer = nn.Sequential(nn.Linear(d_model, 2))
         self.temporal_pred_layer = nn.Sequential(nn.Linear(d_model, 4), nn.Softplus())
         self.token_pred_layers = nn.ModuleList([nn.Linear(d_model, 5) for _ in range(2)])
-        
         # MOD
-        self.user_pred_layers = nn.Sequential(nn.Linear(d_model, self.user))
+        self.user_pred_layers = nn.Sequential(
+            nn.Linear(d_model, 64),
+            nn.LeakyReLU(),
+            nn.Linear(64, self.user))
 
     def forward(self, input_seq, positions):
         """
@@ -98,8 +93,8 @@ class TrajFM(nn.Module):
         causal_mask = gen_causal_mask(L).to(input_seq.device)
 
         # Mod 
-        # mem_seq = self.seq_model(modal_h, norm_coord, mask=causal_mask, src_key_padding_mask=batch_mask)
-        mem_seq = modal_h
+        mem_seq = self.seq_model(modal_h, norm_coord, mask=causal_mask, src_key_padding_mask=batch_mask)
+        # mem_seq = modal_h
         # Mod 
 
         return modal_h, mem_seq
