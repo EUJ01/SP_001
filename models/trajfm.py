@@ -51,8 +51,7 @@ class TrajFM(nn.Module):
 
         # Self-attention layer for aggregating the modals.
         self.modal_mixer = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=d_model, nhead=8, dim_feedforward=256, batch_first=True),
-            num_layers=1)
+            nn.TransformerEncoderLayer(d_model=d_model, nhead=8, dim_feedforward=256, batch_first=True), num_layers=1)
         self.seq_model = RoPE_Encoder(d_model, layers=rope_layer)
 
         # Prediction modules.
@@ -170,50 +169,20 @@ class TrajFM(nn.Module):
             Tensor: predicted temporal tokens with shape (B, L, 4).
             List: predicted token distributions, each item is a Tensor with shape (B, L, n_token).
         """
-        pred_spatial = self.spatial_pred_layer(mem_seq)  # B, F, 2
+        # pred_spatial = self.spatial_pred_layer(mem_seq)  # B, F, 2
 
-        pred_temporal_token = self.temporal_pred_layer(mem_seq)
+        # pred_temporal_token = self.temporal_pred_layer(mem_seq)
         
-        pred_token = [layer(mem_seq) for layer in self.token_pred_layers]  # each (B, L, n_token)
-        if not return_raw:
-            pred_token = torch.argmax(torch.stack(pred_token, 2), -1)  # (B, L, 2)
+        # pred_token = [layer(mem_seq) for layer in self.token_pred_layers]  # each (B, L, n_token)
+        # if not return_raw:
+        #     pred_token = torch.argmax(torch.stack(pred_token, 2), -1)  # (B, L, 2)
             
+        pred_spatial, pred_temporal_token, pred_token = 0,0,0
         # MOD
         mem_seq_pooled = torch.mean(mem_seq, dim=1) 
         pred_user = self.user_pred_layers(mem_seq_pooled)
 
         return pred_spatial, pred_temporal_token, pred_token, pred_user
-
-    def loss(self, input_seq, target_seq, positions):
-        """
-        The loss value calculation of TrajFM.
-
-        Args:
-            target_seq (torch.FloatTensor): contains the generation target features of shape (B, L, F, 2).
-        """
-        target_spatial = target_seq[..., S_COLS, 0]  # (B, L, 2)
-        target_temp_token = tokenize_timestamp(target_seq[:, :, T_COLS, 0])
-        target_token = target_seq[..., [S_COLS[0], T_COLS[0]], 1].long()  # (B, L, 2)
-
-        feature_mask = target_token != UNKNOWN_TOKEN
-        token_mask = target_token == PAD_TOKEN
-
-        B, L, _, _ = target_seq.shape
-        modal_h, mem_seq = self.forward(input_seq, positions)  # (B, L, E)
-
-        pred_spatial, pred_temporal_token, pred_token_dist, _ = self.pred(mem_seq)
-
-        spatial_loss = F.mse_loss(pred_spatial, target_spatial, reduction='none')
-        spatial_loss = masked_mean(spatial_loss, feature_mask[..., 0].unsqueeze(-1))
-        
-        temporal_loss = F.mse_loss(pred_temporal_token, target_temp_token, reduction='none')
-        
-        temporal_loss = masked_mean(temporal_loss, feature_mask[..., 1].unsqueeze(-1))
-        token_loss = rearrange(torch.stack([F.cross_entropy(rearrange(pred_token_dist[i], 'B L N -> (B L) N'),
-                                                            rearrange(torch.clamp(target_token[..., i], max=4), 'B L -> (B L)'), reduction='none')
-                                            for i in range(2)], -1), '(B L) F -> B L F', B=B)
-        token_loss = masked_mean(token_loss, token_mask)
-        return spatial_loss + temporal_loss + token_loss
     
     
     # MOD
@@ -288,63 +257,6 @@ class TrajFM(nn.Module):
             'Macro-F1': f1
         }
     #MOD
-    
-    @torch.no_grad()
-    def test(self, input_seq, target_seq, positions):
-        """The auto-regressive test process of TrajFM.
-
-        Args:
-            input_seq (torch.FloatTensor): contains the input features of shape (B, L_in, F, 2).
-            Different from the `input_seq` in `forward`, an extra start step should be included in the end.
-            target_seq (torch.FloatTensor): contains the target features of shape (B, L_tgt, F, 2).
-            postions (torch.LongTensor): represents the input dual-layer positions of shape (B, L_tgt, 2).
-
-        Returns:
-            Tensor: predicted sequence of spatial features with shape (B, L, 2).
-            Tensor: predicted sequence of temporal tokens with shape (B, L, 4).
-            Tensor: predicted sequence of tokens with shape (B, L, 2).
-        """
-        B, L_in, L_tgt = input_seq.size(0), input_seq.size(1), target_seq.size(1)
-
-        batch_mask = target_seq[:, :, 0, 0] == PAD_TOKEN
-        modal_h, mem_seq = self.forward(input_seq, positions[:, :L_in])
-        
-        pred_spatial, pred_temporal_token, pred_token, _ = self.pred(mem_seq, return_raw=False)
-        spatial_step, temporal_token_step, token_step = pred_spatial[:, -1:], pred_temporal_token[:, -1:], pred_token[:, -1:]
-        
-        for i in range(L_tgt - L_in):
-            positions_step = positions[:, L_in+i-1:L_in+i]
-            modal_h_step, norm_coord = self.cal_modal_h(spatial_step, temporal_token_step, token_step, positions_step)  #不归一化
-            modal_h = torch.cat([modal_h, modal_h_step], 1)
-
-            L_cur = L_in + i + 1
-            causal_mask = gen_causal_mask(L_cur).to(input_seq.device)
-            mem_seq = self.seq_model(modal_h, norm_coord, mask=causal_mask, src_key_padding_mask=batch_mask[:, :L_cur])
-
-            spatial_step, temporal_token_step, token_step, _ = self.pred(mem_seq[:, -1:], return_raw=False)
-
-            pred_spatial = torch.cat([pred_spatial, spatial_step], 1)
-            pred_temporal_token = torch.cat([pred_temporal_token, temporal_token_step], 1)
-            pred_token = torch.cat([pred_token, token_step], 1)
-
-        target_spatial = target_seq[..., S_COLS, 0]  # (B, L, 2)
-        target_temp_token = tokenize_timestamp(target_seq[:, :, T_COLS, 0])
-        target_token = target_seq[..., [S_COLS[0], T_COLS[0]], 1].long()  # (B, L, 2)
-
-        pred_spatial = pred_spatial.cpu().numpy()
-        target_spatial = target_spatial.cpu().numpy()
-        pred_spatial = coord_transform_GPS_UTM(pred_spatial * self.scale + np.expand_dims(self.spatial_middle_coord, 0), self.UTM_region, origin_coord="utm")
-        target_spatial = coord_transform_GPS_UTM(target_spatial * self.scale + np.expand_dims(self.spatial_middle_coord, 0), self.UTM_region, origin_coord="utm")
-
-        # pred_temporal_token, pred_token = pred_temporal_token.cpu().numpy(), pred_token.cpu().numpy()
-        pred_temporal_token = pred_temporal_token.cpu().numpy()
-        pred_token = [t.cpu().numpy() for t in pred_token]
-
-        target_temp_token, target_token = target_temp_token.cpu().numpy(), target_token.cpu().numpy()
-        
-        return [pred_spatial, pred_temporal_token, pred_token], \
-            [target_spatial, target_temp_token, target_token]
-
 
 def masked_mean(values, mask):
     values = values.masked_fill(mask, 0).sum()
