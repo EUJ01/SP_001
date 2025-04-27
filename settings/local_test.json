@@ -1,6 +1,6 @@
 [
     {
-        "save_name": "U56_TrajAll_L1000_v1.3s",
+        "save_name": "U56_TrajAll_L1000_v3.7s",
         "dataset": {
             "train_traj_df": "./dataset/geolife_U56_TrajAll_L1000.h5",
             "test_traj_df": "./dataset/geolife_U56_TrajAll_L1000.h5",
@@ -30,7 +30,8 @@
                 "num_epoch": 60,
                 "lr": 0.0002,
                 "step_size" : 5,
-                "gamma" : 0.3
+                "gamma" : 0.25,
+                "weight_decay": 0.001
             }
         }
     }

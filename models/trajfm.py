@@ -49,19 +49,30 @@ class TrajFM(nn.Module):
         self.pos_encode_layer = PositionalEncode(d_model)
 
         # Self-attention layer for aggregating the modals.
-        self.modal_mixer = nn.TransformerEncoder(
-            nn.TransformerEncoderLayer(d_model=d_model, nhead=8, dim_feedforward=256, batch_first=True), num_layers=1)
+        # self.modal_mixer = nn.TransformerEncoder(nn.TransformerEncoderLayer(d_model=d_model, nhead=8, dim_feedforward=256, batch_first=True), num_layers=1)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=8,
+            dim_feedforward=256,
+            dropout=0.1,  # Add the dropout parameter here
+            batch_first=True  # Keep this to match your input shape
+        )
+        self.modal_mixer = nn.TransformerEncoder(encoder_layer, num_layers=1)
         self.seq_model = RoPE_Encoder(d_model, layers=rope_layer)
 
         # Prediction modules.
         self.spatial_pred_layer = nn.Sequential(nn.Linear(d_model, 2))
         self.temporal_pred_layer = nn.Sequential(nn.Linear(d_model, 4), nn.Softplus())
         self.token_pred_layers = nn.ModuleList([nn.Linear(d_model, 5) for _ in range(2)])
+
         # MOD
-        self.user_pred_layers = nn.Sequential(
-            nn.Linear(d_model, 64),
-            nn.LeakyReLU(),
-            nn.Linear(64, self.user))
+        if self.user < 70:
+            self.user_pred_layers = nn.Sequential(
+                nn.Linear(d_model, 64),
+                nn.LeakyReLU(),
+                nn.Linear(64, self.user))
+        elif self.user > 70:
+            self.user_pred_layers = nn.Sequential(nn.Linear(d_model, self.user))
 
     def forward(self, input_seq, positions):
         """
@@ -170,8 +181,8 @@ class TrajFM(nn.Module):
         # pred_token = [layer(mem_seq) for layer in self.token_pred_layers]  # each (B, L, n_token)
         # if not return_raw:
         #     pred_token = torch.argmax(torch.stack(pred_token, 2), -1)  # (B, L, 2)
-            
         pred_spatial, pred_temporal_token, pred_token = 0,0,0
+        
         # MOD
         mem_seq_pooled = torch.mean(mem_seq, dim=1) 
         pred_user = self.user_pred_layers(mem_seq_pooled)
@@ -252,13 +263,6 @@ class TrajFM(nn.Module):
         }
     #MOD
 
-def masked_mean(values, mask):
-    values = values.masked_fill(mask, 0).sum()
-    count = (~mask).long().sum()
-    if count == 0: return 0
-    return values / count
-
-
 def gen_causal_mask(seq_len, include_self=True):
     """
     Generate a casual mask which prevents i-th output element from
@@ -274,7 +278,6 @@ def gen_causal_mask(seq_len, include_self=True):
     else:
         mask = 1 - torch.tril(torch.ones(seq_len, seq_len)).transpose(0, 1)
     return mask.bool()
-
 
 def tokenize_timestamp(t):
     """Calcualte temporal tokens given the timestamp and delta time.
@@ -292,26 +295,3 @@ def tokenize_timestamp(t):
     minute = t[..., 0] % (60 * 60) / 60
     d_minute = t[..., 1] / 60
     return torch.stack([week, hour, minute, d_minute], -1)
-
-
-def geo_distance(a_coor, b_coor):
-    """Calculate the geographical distance on Earth's surface.
-
-    Args:
-        a_coor (Tensor): one batch of coordiantes with shape (..., 2).
-        b_coor (Tensor): another batch of coordinates with shape (..., 2).
-
-    Returns:
-        Tensor: Calculated geographical distance in meters with shape (...).
-    """
-    a_coor, b_coor = torch.deg2rad(a_coor), torch.deg2rad(b_coor)
-    a_x, a_y = a_coor[..., 0], a_coor[..., 1]
-    b_x, b_y = b_coor[..., 0], b_coor[..., 1]
-    d_x = a_x - b_x
-    d_y = a_y - b_y
-
-    a = torch.sin(d_y / 2) ** 2 + torch.cos(a_y) * torch.cos(b_y) * torch.sin(d_x / 2) ** 2
-    distance = 2 * torch.arcsin(torch.sqrt(a)) * 6371 * 1000
-    return distance
-
-

@@ -45,11 +45,11 @@ def coord_transform_GPS_UTM(traj, UTM_region, origin_coord = "latlong", dest_coo
         raise NotImplementedError(f'coord type error')
 
     if traj.ndim == 2:
-        easting, northing = transform(origin, dest, traj[:,0], traj[:,1])
+        easting, northing = transform(origin, dest, traj[:,0], traj[:,1]) # type: ignore
         traj[:,0] = easting
         traj[:,1] = northing
     elif traj.ndim == 3:
-        easting, northing = transform(origin, dest, traj[:,:,0], traj[:,:,1])
+        easting, northing = transform(origin, dest, traj[:,:,0], traj[:,:,1]) # type: ignore
         traj[:,:,0] = easting
         traj[:,:,1] = northing
     return traj
@@ -112,9 +112,7 @@ class TULPadder:
             L_out = len(traj)
             
             # Prepare input tensor
-            input_row = np.stack([traj_feats, np.ones_like(traj_feats) * KNOWN_TOKEN], axis=-1)  # (L_out, F+1, 2)
-            # Mask user ID with UNKNOWN_TOKEN if needed for privacy (optional based on your task)
-            # input_row[:, 0, 1] = UNKNOWN_TOKEN  # Example masking user part, if applicable
+            input_row = np.stack([traj_feats, np.ones_like(traj_feats) * KNOWN_TOKEN], axis = -1)  # (L, F, 2)
             
             # Prepare output tensor (single one-hot encoding)
             output_row = np.zeros((1, self.num_users))  # (1, num_users)

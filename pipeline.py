@@ -9,7 +9,7 @@ import json
 import os
 
 # MOD
-def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch, lr, step_size, gamma, data_summary):
+def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch, lr, step_size, gamma, weight_decay, data_summary):
     """Train the model given the training dataloader and validate after each epoch.
     
     Args:
@@ -27,7 +27,8 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
         config = json.load(fp)
         config = config[0]
 
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     # scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
     scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=gamma, patience=step_size, verbose=True)
 
@@ -81,10 +82,10 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
             loss_epoch = np.mean(loss_values)
             bar.set_description(bar_desc % loss_epoch)
             log.append({'epoch': epoch_i, 'time': epoch_time, 'loss': loss_epoch})
-            scheduler.step(val_loss)
             
             # Validation
             val_metrics, val_loss = test_user_model(model, device, val_dataloader)
+            scheduler.step(val_loss)
 
             for key, value in val_metrics.items():
                 print(f"{key}: {round(value * 100, 2)}%,")
