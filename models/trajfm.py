@@ -1,12 +1,11 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-from einops import rearrange, repeat
+from einops import rearrange
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 from models.encode import PositionalEncode, FourierEncode, RoPE_Encoder
 from data import KNOWN_TOKEN, UNKNOWN_TOKEN, PAD_TOKEN, ST_MAP, coord_transform_GPS_UTM
-import numpy as np
 
 S_COLS = ST_MAP['spatial']
 T_COLS = ST_MAP['temporal']
@@ -111,6 +110,7 @@ class TrajFM(nn.Module):
             Tensor: the sequence of modal hidden states with shape (B, L, E).
         """
         B = spatial.size(0)
+        norm_coord = spatial
 
         # Embedding of tokens for the spatial and temporal modals.
         token_e = self.token_embed_layer(token)  # (B, L, F, E)
@@ -119,16 +119,12 @@ class TrajFM(nn.Module):
         # Specifically, features where the token is not "KNOWN" or "UNKNOWN".
         feature_e_mask = ~torch.isin(token, torch.tensor([KNOWN_TOKEN, UNKNOWN_TOKEN]).to(token.device))  # (B, L, 2)
 
-        norm_coord = spatial
-
         spatial_e = self.spatial_embed_layer(norm_coord)  # (B, L, E)
         spatial_e.masked_fill(feature_e_mask[..., 0].unsqueeze(-1), 0)
         spatial_e += token_e[:, :, 0]
 
-
         # Calculate nearest POI of each coordinates.
-        poi = ((self.poi_coors.unsqueeze(0).unsqueeze(0) -
-                spatial.unsqueeze(2)) ** 2).sum(-1).argmin(dim=-1)
+        poi = ((self.poi_coors.unsqueeze(0).unsqueeze(0) - spatial.unsqueeze(2)) ** 2).sum(-1).argmin(dim=-1)
         poi_e = self.poi_embed_layer(self.poi_embed_mat[poi])
         poi_e.masked_fill(feature_e_mask[..., 0].unsqueeze(-1), 0)
         poi_e += token_e[:, :, 0]
@@ -143,12 +139,10 @@ class TrajFM(nn.Module):
         temporal_e += token_e[:, :, 1]
 
         # Aggregate and mix the hidden states of all modals.
-        modal_e = rearrange(torch.stack([spatial_e, temporal_e, poi_e], 2),
-                            'B L F E -> (B L) F E')
+        modal_e = rearrange(torch.stack([spatial_e, temporal_e, poi_e], 2), 'B L F E -> (B L) F E')
 
         # Mod no POI
-        # modal_e = rearrange(torch.stack([spatial_e, temporal_e], 2),
-        #                     'B L F E -> (B L) F E')
+        # modal_e = rearrange(torch.stack([spatial_e, temporal_e], 2), 'B L F E -> (B L) F E')
                             
         modal_h = rearrange(self.modal_mixer(modal_e), '(B L) F E -> B L F E', B=B).mean(axis=2)
 

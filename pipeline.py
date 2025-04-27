@@ -2,7 +2,7 @@ from time import time
 import pandas as pd
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import StepLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import trange, tqdm
 import wandb
 import json
@@ -28,7 +28,8 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
         config = config[0]
 
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)  
+    # scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=gamma, patience=step_size, verbose=True)
 
     bar_desc = 'Training, avg loss: %.3f'
     log = []
@@ -80,7 +81,7 @@ def train_user_model(model, train_dataloader, val_dataloader, device, num_epoch,
             loss_epoch = np.mean(loss_values)
             bar.set_description(bar_desc % loss_epoch)
             log.append({'epoch': epoch_i, 'time': epoch_time, 'loss': loss_epoch})
-            scheduler.step()
+            scheduler.step(val_loss)
             
             # Validation
             val_metrics, val_loss = test_user_model(model, device, val_dataloader)
